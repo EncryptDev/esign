@@ -42,6 +42,24 @@ class UserSeeder extends Seeder
             'company_name' => 'e-Signing Solutions Inc.',
             'email_verified_at' => now(),
         ]);
+        User::create([
+            'name' => 'Bayu Febriyono Putra',
+            'email' => 'bayufebriyono@encryptdev.com',
+            'password' => Hash::make('password'),
+            'job_title' => 'Direktur',
+            'department' => '-',
+            'company_name' => 'PT Encrypt Digital Solution',
+            'email_verified_at' => now(),
+        ]);
+        User::create([
+            'name' => 'Dwi Adishtya Nur Mardhiana',
+            'email' => 'dwiadishtya@encryptdev.com',
+            'password' => Hash::make('password'),
+            'job_title' => 'Human Resource',
+            'department' => 'HR',
+            'company_name' => 'PT Encrypt Digital Solution',
+            'email_verified_at' => now(),
+        ]);
 
         // Test User 3
         User::create([
