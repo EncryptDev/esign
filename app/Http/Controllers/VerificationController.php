@@ -172,10 +172,13 @@ class VerificationController extends Controller
         'validityBadge' => $this->getValidityBadge($barcodeToken->is_valid),
     ];
 
+  // ... kode sebelumnya ...
+
+    // Add document-specific data if exists (for document signatures)
     if ($signature && $document) {
         $data['signature'] = $signature;
         $data['signedAt'] = $signature->signed_at;
-        $data['signatureHash'] = substr($signature->signature_hash, 0, 16);
+        $data['signatureHash'] = substr($signature->signature_hash, 0, 16); // Didefinisikan di sini
         $data['document'] = $document;
         $data['documentTitle'] = $document->title;
         $data['documentPurpose'] = $document->purpose;
@@ -183,15 +186,20 @@ class VerificationController extends Controller
         $data['documentUuid'] = $document->uuid;
         $data['statusBadge'] = $this->getStatusBadge($document->status);
     } else {
+        // Standalone QR code (no document)
         $data['signature'] = null;
         $data['document'] = null;
-        // Gunakan metadata jika ini standalone barcode
-        $data['documentTitle'] = $barcodeToken->metadata['title'] ?? 'N/A';
-        $data['documentPurpose'] = $barcodeToken->metadata['purpose'] ?? 'N/A';
         $data['signedAt'] = $barcodeToken->created_at;
+
+        // TAMBAHKAN INI: Berikan fallback agar Blade tidak error
+        $data['signatureHash'] = substr(hash('sha256', $barcodeToken->token), 0, 16);
+        $data['documentTitle'] = $barcodeToken->metadata['title'] ?? 'Standalone Verification';
+        $data['documentPurpose'] = $barcodeToken->metadata['purpose'] ?? 'General Purpose';
     }
 
     return $data;
+
+
 }
 
     /**

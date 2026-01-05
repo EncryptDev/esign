@@ -199,7 +199,7 @@
                             <div class="sm:col-span-2">
                                 <dt class="text-sm font-medium text-gray-500">Signature Hash</dt>
                                 <dd class="mt-1 text-xs text-gray-900 font-mono bg-gray-50 p-2 rounded">
-                                    {{ $signatureHash }}...
+                                    {{ $signatureHash ?? 'N/A' }}...
                                 </dd>
                             </div>
                         </dl>
