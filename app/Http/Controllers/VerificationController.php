@@ -116,18 +116,18 @@ class VerificationController extends Controller
             $barcodeToken->update(['last_verified_at' => now()]);
 
             // Create audit log
-            $this->auditService->log(
-                'SIGNATURE_VERIFIED',
-                $barcodeToken->signature,
-                'Signature verification performed',
-                null,
-                [
-                    'verified_count' => $barcodeToken->verified_count,
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
-                ],
-                null // No authenticated user for public verification
-            );
+           $this->auditService->log(
+    'SIGNATURE_VERIFIED',
+    $barcodeToken->signature ?? $barcodeToken, // Jika signature null, gunakan barcodeToken
+    'Signature verification performed',
+    null,
+    [
+        'verified_count' => $barcodeToken->verified_count,
+        'ip_address' => $request->ip(),
+        'user_agent' => $request->userAgent(),
+    ],
+    null
+);
         });
     }
 
@@ -137,54 +137,62 @@ class VerificationController extends Controller
      * @param BarcodeToken $barcodeToken
      * @return array
      */
-    private function prepareVerificationData(BarcodeToken $barcodeToken): array
-    {
-        $signature = $barcodeToken->signature;
-        $document = $signature ? $signature->document : null;
-        $signer = $barcodeToken->user;
-
-        $data = [
-            // Token information
-            'barcodeToken' => $barcodeToken,
-            'tokenHash' => substr(hash('sha256', $barcodeToken->token), 0, 16),
-
-            // Signer information (always available)
-            'signer' => $signer,
-            'signerName' => $signer->name,
-            'signerJobTitle' => $signer->job_title,
-            'signerDepartment' => $signer->department,
-            'signerCompany' => $signer->company_name,
-
-            // Verification metadata
-            'verificationCount' => $barcodeToken->verified_count,
-            'lastVerified' => $barcodeToken->last_verified_at,
-            'expiresAt' => $barcodeToken->expires_at,
-            'isValid' => $barcodeToken->is_valid,
-
-            // Status badges
-            'validityBadge' => $this->getValidityBadge($barcodeToken->is_valid),
-        ];
-
-        // Add document-specific data if exists (for document signatures)
-        if ($signature && $document) {
-            $data['signature'] = $signature;
-            $data['signedAt'] = $signature->signed_at;
-            $data['signatureHash'] = substr($signature->signature_hash, 0, 16);
-            $data['document'] = $document;
-            $data['documentTitle'] = $document->title;
-            $data['documentPurpose'] = $document->purpose;
-            $data['documentStatus'] = $document->status;
-            $data['documentUuid'] = $document->uuid;
-            $data['statusBadge'] = $this->getStatusBadge($document->status);
-        } else {
-            // Standalone QR code (no document)
-            $data['signature'] = null;
-            $data['document'] = null;
-            $data['signedAt'] = $barcodeToken->created_at;
-        }
-
-        return $data;
+ private function prepareVerificationData(BarcodeToken $barcodeToken): array
+{
+    // Eager load user jika belum ada untuk menghindari N+1 query
+    if (!$barcodeToken->relationLoaded('user')) {
+        $barcodeToken->load('user');
     }
+
+    $signature = $barcodeToken->signature;
+    $document = $signature ? $signature->document : null;
+    $signer = $barcodeToken->user;
+
+    // Ambil data dari User model, jika User tidak ada (null), ambil dari metadata sebagai backup
+    $signerName = $signer->name ?? ($barcodeToken->metadata['created_by'] ?? 'N/A');
+    $signerJobTitle = $signer->job_title ?? ($barcodeToken->metadata['job_title'] ?? '-');
+    $signerCompany = $signer->company_name ?? ($barcodeToken->metadata['company'] ?? '-');
+
+    $data = [
+        'barcodeToken' => $barcodeToken,
+        'tokenHash' => substr(hash('sha256', $barcodeToken->token), 0, 16),
+
+        // Signer information
+        'signer' => $signer,
+        'signerName' => $signerName,
+        'signerJobTitle' => $signerJobTitle,
+        'signerDepartment' => $signer->department ?? '-',
+        'signerCompany' => $signerCompany,
+
+        // Verification metadata
+        'verificationCount' => $barcodeToken->verified_count,
+        'lastVerified' => $barcodeToken->last_verified_at,
+        'expiresAt' => $barcodeToken->expires_at,
+        'isValid' => $barcodeToken->is_valid,
+        'validityBadge' => $this->getValidityBadge($barcodeToken->is_valid),
+    ];
+
+    if ($signature && $document) {
+        $data['signature'] = $signature;
+        $data['signedAt'] = $signature->signed_at;
+        $data['signatureHash'] = substr($signature->signature_hash, 0, 16);
+        $data['document'] = $document;
+        $data['documentTitle'] = $document->title;
+        $data['documentPurpose'] = $document->purpose;
+        $data['documentStatus'] = $document->status;
+        $data['documentUuid'] = $document->uuid;
+        $data['statusBadge'] = $this->getStatusBadge($document->status);
+    } else {
+        $data['signature'] = null;
+        $data['document'] = null;
+        // Gunakan metadata jika ini standalone barcode
+        $data['documentTitle'] = $barcodeToken->metadata['title'] ?? 'N/A';
+        $data['documentPurpose'] = $barcodeToken->metadata['purpose'] ?? 'N/A';
+        $data['signedAt'] = $barcodeToken->created_at;
+    }
+
+    return $data;
+}
 
     /**
      * Get status badge configuration
